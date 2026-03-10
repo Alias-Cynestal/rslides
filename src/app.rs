@@ -2,19 +2,24 @@ use std::path::PathBuf;
 use iced::Element;
 use crate::ui;
 
+#[derive(Clone)]
 pub enum Message {
     NextSlide,
     PreviousSlide,
+    PlaySlideshow,
+    PauseSlideshow,
+    OpenFolder,
+    Exit
 }
 
 #[derive(Debug)]
-pub struct RSlidesState {
-    current_folder: Option<PathBuf>,
-    images: Vec<PathBuf>,
-    current_index: usize,
-    is_playing: bool,
-    slideshow_interval_secs: u64,
-    error_message: Option<String>,
+pub(crate) struct RSlidesState {
+    pub current_folder: Option<PathBuf>,
+    pub images: Vec<PathBuf>,
+    pub current_index: usize,
+    pub is_playing: bool,
+    pub slideshow_interval_secs: u64,
+    pub error_message: Option<String>,
 }
 
 #[derive(Debug)]
@@ -40,10 +45,18 @@ impl RSlides {
         match message {
             Message::NextSlide => todo!(),
             Message::PreviousSlide => todo!(),
+            Message::PlaySlideshow => {
+                self.app_state.is_playing = true;
+            },
+            Message::PauseSlideshow => {
+                self.app_state.is_playing = false;
+            },
+            Message::OpenFolder => todo!(),
+            Message::Exit => std::process::exit(0),
         }
     }
 
-    pub fn view(&self) -> Element<Message> {
+    pub fn view(&self) -> Element<'_, Message> {
         ui::view(&self.app_state)
     }
 }
