@@ -1,6 +1,7 @@
 mod app;
 mod ui;
 mod widgets;
+pub mod utils;
 
 use iced::{window};
 use app::RSlides;

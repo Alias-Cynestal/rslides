@@ -9,6 +9,7 @@ dependencies = [
  "iced",
  "iced_aw",
  "iced_font_awesome",
+ "nfd2",
 ]
 
 [[package]]
@@ -2196,6 +2197,15 @@ name = "new_debug_unreachable"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
+
+[[package]]
+name = "nfd2"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4001f1a6d9abb85ad5e983dca9906b46dbee553c687cc789bc5d09aa0feffaa5"
+dependencies = [
+ "cc",
+]
 
 [[package]]
 name = "nom"

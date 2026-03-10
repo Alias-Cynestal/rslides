@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 use iced::Element;
 use crate::ui;
+use std::fs::read_dir;
+use crate::utils::open_folder::select_folder;
 
 #[derive(Clone)]
 pub enum Message {
@@ -51,7 +53,7 @@ impl RSlides {
             Message::PauseSlideshow => {
                 self.app_state.is_playing = false;
             },
-            Message::OpenFolder => todo!(),
+            Message::OpenFolder => select_folder(&mut self.app_state),
             Message::Exit => std::process::exit(0),
         }
     }
