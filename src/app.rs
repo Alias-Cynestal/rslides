@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use iced::Element;
 use crate::ui;
-use std::fs::read_dir;
+use iced::Subscription;
 use crate::utils::handle_slideshow::{get_next_slide, get_previous_slide};
 use crate::utils::open_folder::select_folder;
 
@@ -61,5 +61,14 @@ impl RSlides {
 
     pub fn view(&self) -> Element<'_, Message> {
         ui::view(&self.app_state)
+    }
+
+    pub fn timer_subscription(&self) -> Subscription<Message> {
+        if self.app_state.is_playing {
+            iced::time::every(std::time::Duration::from_secs(self.app_state.slideshow_interval_secs))
+                .map(|_| Message::NextSlide)
+        } else {
+            Subscription::none()
+        }
     }
 }

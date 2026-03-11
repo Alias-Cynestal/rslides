@@ -25,5 +25,7 @@ pub fn main() -> iced::Result {
           icon: None,
           platform_specific: Default::default(),
           exit_on_close_request: true,
-     }).run()
+     })
+         .subscription(RSlides::timer_subscription)
+         .run()
 }
