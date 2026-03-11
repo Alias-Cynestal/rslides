@@ -1,11 +1,11 @@
 use std::fs::read_dir;
 use std::path::PathBuf;
 
-pub fn select_folder(app_state: &mut crate::app::RSlidesState) {
+pub(crate) fn select_folder(app_state: &mut crate::app::RSlidesState) {
     let result = nfd2::open_pick_folder(None).expect("Failed to open nfd");
     match result {
         nfd2::Response::Okay(folder_path) => {
-            app_state.images.clear();
+            reset_slideshow(app_state);
             app_state.current_folder = Some(PathBuf::from(folder_path));
             read_dir(app_state.current_folder.as_ref().unwrap())
                 .expect("Failed to read directory")
@@ -22,4 +22,10 @@ pub fn select_folder(app_state: &mut crate::app::RSlidesState) {
         }
         _ => (),
     }
+}
+
+fn reset_slideshow(app_state: &mut crate::app::RSlidesState) {
+    app_state.current_index = 0;
+    app_state.images.clear();
+    app_state.current_folder = None;
 }

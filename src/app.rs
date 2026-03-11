@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use iced::Element;
 use crate::ui;
 use std::fs::read_dir;
+use crate::utils::handle_slideshow::{get_next_slide, get_previous_slide};
 use crate::utils::open_folder::select_folder;
 
 #[derive(Clone)]
@@ -45,8 +46,8 @@ impl RSlides {
 
     pub fn update(&mut self, message: Message) {
         match message {
-            Message::NextSlide => todo!(),
-            Message::PreviousSlide => todo!(),
+            Message::NextSlide => get_next_slide(&mut self.app_state),
+            Message::PreviousSlide => get_previous_slide(&mut self.app_state),
             Message::PlaySlideshow => {
                 self.app_state.is_playing = true;
             },
