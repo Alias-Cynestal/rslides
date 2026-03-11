@@ -1,9 +1,16 @@
 use std::fs::read_dir;
 use std::path::PathBuf;
+use iced::Task;
+use nfd2::Response;
+use crate::app::Message;
 
-pub(crate) fn select_folder(app_state: &mut crate::app::RSlidesState) {
-    let result = nfd2::open_pick_folder(None).expect("Failed to open nfd");
-    match result {
+pub(crate) fn select_folder() -> Task<Message> {
+    Task::perform(open_file_dialog(), Message::FolderSelected)
+
+}
+
+pub(crate) fn load_folder(app_state: &mut crate::app::RSlidesState, response: Response) {
+    match response {
         nfd2::Response::Okay(folder_path) => {
             reset_slideshow(app_state);
             app_state.current_folder = Some(PathBuf::from(folder_path));
@@ -22,6 +29,10 @@ pub(crate) fn select_folder(app_state: &mut crate::app::RSlidesState) {
         }
         _ => (),
     }
+}
+
+async fn open_file_dialog() -> Response {
+    nfd2::open_pick_folder(None).expect("Failed to open nfd")
 }
 
 fn reset_slideshow(app_state: &mut crate::app::RSlidesState) {

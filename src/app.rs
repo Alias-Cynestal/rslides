@@ -1,9 +1,10 @@
 use std::path::PathBuf;
-use iced::Element;
+use iced::{Element, Task};
 use crate::ui;
 use iced::Subscription;
+use nfd2::Response;
 use crate::utils::handle_slideshow::{get_next_slide, get_previous_slide};
-use crate::utils::open_folder::select_folder;
+use crate::utils::open_folder::{load_folder, select_folder};
 
 #[derive(Clone)]
 pub enum Message {
@@ -12,6 +13,7 @@ pub enum Message {
     PlaySlideshow,
     PauseSlideshow,
     OpenFolder,
+    FolderSelected(Response),
     Exit
 }
 
@@ -38,13 +40,13 @@ impl RSlides {
                 images: Vec::new(),
                 current_index: 0,
                 is_playing: false,
-                slideshow_interval_secs: 5,
+                slideshow_interval_secs: 2500,
                 error_message: None,
             },
         }
     }
 
-    pub fn update(&mut self, message: Message) {
+    pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::NextSlide => get_next_slide(&mut self.app_state),
             Message::PreviousSlide => get_previous_slide(&mut self.app_state),
@@ -54,9 +56,13 @@ impl RSlides {
             Message::PauseSlideshow => {
                 self.app_state.is_playing = false;
             },
-            Message::OpenFolder => select_folder(&mut self.app_state),
+            Message::OpenFolder => {
+                return select_folder()
+            },
+            Message::FolderSelected(response) => load_folder(&mut self.app_state, response),
             Message::Exit => std::process::exit(0),
         }
+        Task::none()
     }
 
     pub fn view(&self) -> Element<'_, Message> {
@@ -65,7 +71,7 @@ impl RSlides {
 
     pub fn timer_subscription(&self) -> Subscription<Message> {
         if self.app_state.is_playing {
-            iced::time::every(std::time::Duration::from_secs(self.app_state.slideshow_interval_secs))
+            iced::time::every(std::time::Duration::from_millis(self.app_state.slideshow_interval_secs))
                 .map(|_| Message::NextSlide)
         } else {
             Subscription::none()
