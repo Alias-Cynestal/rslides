@@ -6,12 +6,11 @@ use crate::app::Message;
 
 pub(crate) fn select_folder() -> Task<Message> {
     Task::perform(open_file_dialog(), Message::FolderSelected)
-
 }
 
 pub(crate) fn load_folder(app_state: &mut crate::app::RSlidesState, response: Response) {
     match response {
-        nfd2::Response::Okay(folder_path) => {
+        Response::Okay(folder_path) => {
             reset_slideshow(app_state);
             app_state.current_folder = Some(PathBuf::from(folder_path));
             read_dir(app_state.current_folder.as_ref().unwrap())

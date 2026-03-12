@@ -1,10 +1,13 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
 use iced::{Element, Task};
+use iced::widget::image::Handle;
 use crate::ui;
 use iced::Subscription;
 use nfd2::Response;
 use crate::utils::handle_slideshow::{get_next_slide, get_previous_slide};
 use crate::utils::open_folder::{load_folder, select_folder};
+use crate::utils::image_loader::load_image_async;
 
 #[derive(Clone)]
 pub enum Message {
@@ -13,43 +16,51 @@ pub enum Message {
     PlaySlideshow,
     PauseSlideshow,
     OpenFolder,
+    ImageLoaded(usize, Handle),
     FolderSelected(Response),
-    Exit
+    Exit,
 }
 
-#[derive(Debug)]
 pub(crate) struct RSlidesState {
     pub current_folder: Option<PathBuf>,
     pub images: Vec<PathBuf>,
+    pub images_handles: HashMap<usize, Handle>,
+    pub nb_preloaded_images: usize,
     pub current_index: usize,
     pub is_playing: bool,
     pub slideshow_interval_secs: u64,
-    pub error_message: Option<String>,
 }
 
-#[derive(Debug)]
 pub struct RSlides {
     app_state: RSlidesState,
 }
 
 impl RSlides {
     pub fn new() -> Self {
+        let app_state = RSlidesState {
+            current_folder: None,
+            images: Vec::new(),
+            images_handles: HashMap::new(),
+            nb_preloaded_images: 10,
+            current_index: 0,
+            is_playing: false,
+            slideshow_interval_secs: 2500,
+        };
         Self {
-            app_state : RSlidesState {
-                current_folder: None,
-                images: Vec::new(),
-                current_index: 0,
-                is_playing: false,
-                slideshow_interval_secs: 2500,
-                error_message: None,
-            },
+            app_state,
         }
     }
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::NextSlide => get_next_slide(&mut self.app_state),
-            Message::PreviousSlide => get_previous_slide(&mut self.app_state),
+            Message::NextSlide => {
+                get_next_slide(&mut self.app_state);
+                return self.update_handles_async(true);
+            },
+            Message::PreviousSlide => {
+                get_previous_slide(&mut self.app_state);
+                return self.update_handles_async(false);
+            },
             Message::PlaySlideshow => {
                 self.app_state.is_playing = true;
             },
@@ -59,10 +70,114 @@ impl RSlides {
             Message::OpenFolder => {
                 return select_folder()
             },
-            Message::FolderSelected(response) => load_folder(&mut self.app_state, response),
+            Message::FolderSelected(response) => {
+                load_folder(&mut self.app_state, response);
+                return self.preload_handles_async();
+            },
+            Message::ImageLoaded(index, handle) => {
+                self.app_state.images_handles.insert(index, handle);
+            },
             Message::Exit => std::process::exit(0),
         }
         Task::none()
+    }
+    
+    fn preload_handles_async(&mut self) -> Task<Message> {
+        self.app_state.images_handles.clear();
+
+        let current = self.app_state.current_index;
+        let total = self.app_state.images.len();
+        let preload_range = self.app_state.nb_preloaded_images;
+
+        if total == 0 {
+            return Task::none();
+        }
+
+        let start = if current >= preload_range {
+            current - preload_range
+        } else {
+            total.saturating_sub(preload_range - current)
+        };
+
+        let end = (current + preload_range) % total;
+
+        // Collect indices to load
+        let mut indices_to_load = Vec::new();
+        if start <= end {
+            for i in start..=end {
+                indices_to_load.push(i);
+            }
+        } else {
+            for i in start..total {
+                indices_to_load.push(i);
+            }
+            for i in 0..=end {
+                indices_to_load.push(i);
+            }
+        }
+
+        let tasks: Vec<Task<Message>> = indices_to_load
+            .into_iter()
+            .filter(|&i| !self.app_state.images_handles.contains_key(&i))
+            .filter_map(|i| {
+                self.app_state.images.get(i).map(|path| {
+                    let path = path.clone();
+                    Task::perform(
+                        load_image_async(i, path),
+                        |(index, handle)| Message::ImageLoaded(index, handle)
+                    )
+                })
+            })
+            .collect();
+
+        Task::batch(tasks)
+    }
+
+    fn update_handles_async(&mut self, is_moving_forward: bool) -> Task<Message> {
+        let current = self.app_state.current_index;
+        let total = self.app_state.images.len();
+        let preload_range = self.app_state.nb_preloaded_images;
+        let max_handles = 2 * preload_range + 1;
+
+        if total == 0 {
+            return Task::none();
+        }
+        let index_to_load = if is_moving_forward {
+            let next_to_load = (current + preload_range) % total;
+            let oldest_relevant = if current >= preload_range {
+                current - preload_range
+            } else {
+                total.saturating_sub(preload_range - current)
+            };
+            if self.app_state.images_handles.len() > max_handles {
+                self.app_state.images_handles.remove(&oldest_relevant);
+            }
+            next_to_load
+        } else {
+            let prev_to_load = if current >= preload_range {
+                current - preload_range
+            } else {
+                total.saturating_sub(preload_range - current)
+            };
+            let newest_irrelevant = (current + preload_range) % total;
+            if self.app_state.images_handles.len() > max_handles {
+                self.app_state.images_handles.remove(&newest_irrelevant);
+            }
+            prev_to_load
+        };
+
+        if self.app_state.images_handles.contains_key(&index_to_load) {
+            return Task::none();
+        }
+        if let Some(path) = self.app_state.images.get(index_to_load) {
+            let path = path.clone();
+            Task::perform(
+                load_image_async(index_to_load, path),
+                |(index, handle)| Message::ImageLoaded(index, handle)
+            )
+        } else {
+            Task::none()
+        }
     }
 
     pub fn view(&self) -> Element<'_, Message> {
@@ -78,3 +193,4 @@ impl RSlides {
         }
     }
 }
+
