@@ -9,6 +9,7 @@ pub(crate) fn select_folder() -> Task<Message> {
 }
 
 pub(crate) fn load_folder(app_state: &mut crate::app::RSlidesState, response: Response) {
+    let mut i = 0;
     match response {
         Response::Okay(folder_path) => {
             reset_slideshow(app_state);
@@ -24,7 +25,10 @@ pub(crate) fn load_folder(app_state: &mut crate::app::RSlidesState, response: Re
                         false
                     }
                 })
-                .for_each(|path| app_state.images.push(path));
+                .for_each(|path| {
+                    app_state.images.push((i, path));
+                    i += 1;
+                });
         }
         _ => (),
     }

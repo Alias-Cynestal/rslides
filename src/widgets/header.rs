@@ -3,7 +3,7 @@ use iced::widget::{button, row, Row, Text};
 use iced_font_awesome::{fa_icon_solid};
 use crate::app::Message;
 
-pub fn new(is_playing: &bool) -> Element<'static, Message> {
+pub fn new(is_playing: &bool, is_randomized: &bool) -> Element<'static, Message> {
     let app_title = Text::new("RSlides").
         size(50)
         .align_x(Alignment::Start);
@@ -19,6 +19,15 @@ pub fn new(is_playing: &bool) -> Element<'static, Message> {
         false => button(
             fa_icon_solid("play").size(20.0).color(color!(255, 255, 255))
         ).on_press(Message::PlaySlideshow),
+    };
+
+    let random_button: iced::widget::Button<'_, _, Theme, Renderer> = match is_randomized  {
+        true => button(
+            fa_icon_solid("shuffle").size(20.0).color(color!(255, 255, 255))
+        ).on_press(Message::ResetSlideOrder),
+        false => button(
+            fa_icon_solid("shuffle").size(20.0).color(color!(0, 0, 0))
+        ).on_press(Message::RandomizeSlides),
     };
 
     let next_button: iced::widget::Button<'_, _, Theme, Renderer> = button(
@@ -37,6 +46,7 @@ pub fn new(is_playing: &bool) -> Element<'static, Message> {
         previous_button,
         play_pause_button,
         next_button,
+        random_button,
         open_folder_button,
         exit_button
     )
@@ -47,7 +57,7 @@ pub fn new(is_playing: &bool) -> Element<'static, Message> {
         .push(app_title)
         .push(controls)
         .width(Fill)
-        .spacing(2100)
+        .spacing(2000)
         .align_y(Alignment::Center)
         .into()
 }

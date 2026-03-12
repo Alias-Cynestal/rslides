@@ -1,22 +1,29 @@
-use iced::{Center, Element, Fill};
-use iced::widget::{container, image, text, Column};
+use iced::{Background, Center, Color, ContentFit, Element, Fill, Length};
+use iced::widget::{container, image, text, Column, Container};
 use iced_aw::Spinner;
 
 pub fn new<'a>(app_state: &'_ crate::app::RSlidesState) -> Element<'_, crate::app::Message> {
     if let Some(_current_folder) = &app_state.current_folder {
         if !app_state.images.is_empty() {
-            return if let Some(handle) = app_state.images_handles.get(&app_state.current_index) {
-                container(image(handle))
-                    .center_x(Fill)
-                    .center_y(Fill)
-                    .into()
+            let image = if let Some(handle) = app_state.images_handles.get(&app_state.current_index) {
+                image(handle)
             } else {
-                let current_image_path = &app_state.images[app_state.current_index];
-                container(image(current_image_path))
-                    .center_x(Fill)
-                    .center_y(Fill)
-                    .into()
+                let current_image_path = &app_state.images[app_state.current_index].1;
+                image(current_image_path)
             }
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .content_fit(ContentFit::Contain);
+
+            return container(image)
+                .width(Fill)
+                .height(Fill)
+                .center(Fill)
+                .style(|_x| container::Style {
+                    background: Some(Background::Color(Color::from_rgb8(0,0,0))),
+                    ..Default::default()
+                })
+                .into()
         }
     }
     container(Column::new()
@@ -31,8 +38,11 @@ pub fn new<'a>(app_state: &'_ crate::app::RSlidesState) -> Element<'_, crate::ap
         )
         .align_x(Center)
     )
-    .center_x(Fill)
-    .center_y(Fill)
+    .style(|_x| container::Style {
+        background: Some(Background::Color(Color::from_rgb8(0, 0, 0))),
+        ..Default::default()
+    })
+    .center(Fill)
     .into()
 
 }

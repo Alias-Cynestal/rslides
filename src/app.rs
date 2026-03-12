@@ -5,7 +5,7 @@ use iced::widget::image::Handle;
 use crate::ui;
 use iced::Subscription;
 use nfd2::Response;
-use crate::utils::handle_slideshow::{get_next_slide, get_previous_slide};
+use crate::utils::handle_slideshow::{get_next_slide, get_previous_slide, randomize_slides, reset_slide_order};
 use crate::utils::open_folder::{load_folder, select_folder};
 use crate::utils::image_loader::load_image_async;
 
@@ -16,6 +16,8 @@ pub enum Message {
     PlaySlideshow,
     PauseSlideshow,
     OpenFolder,
+    RandomizeSlides,
+    ResetSlideOrder,
     ImageLoaded(usize, Handle),
     FolderSelected(Response),
     Exit,
@@ -23,11 +25,12 @@ pub enum Message {
 
 pub(crate) struct RSlidesState {
     pub current_folder: Option<PathBuf>,
-    pub images: Vec<PathBuf>,
+    pub images: Vec<(usize, PathBuf)>, // Store index to return to original order if needed
     pub images_handles: HashMap<usize, Handle>,
     pub nb_preloaded_images: usize,
     pub current_index: usize,
     pub is_playing: bool,
+    pub is_randomized: bool,
     pub slideshow_interval_secs: u64,
 }
 
@@ -44,6 +47,7 @@ impl RSlides {
             nb_preloaded_images: 10,
             current_index: 0,
             is_playing: false,
+            is_randomized: false,
             slideshow_interval_secs: 2500,
         };
         Self {
@@ -72,16 +76,29 @@ impl RSlides {
             },
             Message::FolderSelected(response) => {
                 load_folder(&mut self.app_state, response);
+                if (self.app_state.is_randomized) {
+                    randomize_slides(&mut self.app_state);
+                }
                 return self.preload_handles_async();
             },
             Message::ImageLoaded(index, handle) => {
                 self.app_state.images_handles.insert(index, handle);
             },
             Message::Exit => std::process::exit(0),
+            Message::RandomizeSlides => {
+                self.app_state.is_randomized = true;
+                randomize_slides(&mut self.app_state);
+                return self.preload_handles_async();
+            }
+            Message::ResetSlideOrder => {
+                self.app_state.is_randomized = false;
+                reset_slide_order(&mut self.app_state);
+                return self.preload_handles_async();
+            },
         }
         Task::none()
     }
-    
+
     fn preload_handles_async(&mut self) -> Task<Message> {
         self.app_state.images_handles.clear();
 
@@ -123,7 +140,7 @@ impl RSlides {
                 self.app_state.images.get(i).map(|path| {
                     let path = path.clone();
                     Task::perform(
-                        load_image_async(i, path),
+                        load_image_async(i, path.1),
                         |(index, handle)| Message::ImageLoaded(index, handle)
                     )
                 })
@@ -172,7 +189,7 @@ impl RSlides {
         if let Some(path) = self.app_state.images.get(index_to_load) {
             let path = path.clone();
             Task::perform(
-                load_image_async(index_to_load, path),
+                load_image_async(index_to_load, path.1),
                 |(index, handle)| Message::ImageLoaded(index, handle)
             )
         } else {

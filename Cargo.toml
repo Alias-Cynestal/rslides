@@ -8,5 +8,6 @@ iced = { version = "0.14.0", features = ["image", "smol"] }
 iced_aw = "0.13.1"
 iced_font_awesome = "0.4.2"
 nfd2 = "0.3.1"
-image = "0.25"
+image = "0.25.10"
 smol = "2.0"
+rand = "0.10.0"
