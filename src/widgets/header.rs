@@ -38,6 +38,10 @@ pub fn new(is_playing: &bool, is_randomized: &bool) -> Element<'static, Message>
         fa_icon_solid("folder-open").size(20.0).color(color!(255, 255, 255))
     ).on_press(Message::OpenFolder);
 
+    let fullscreen_button: iced::widget::Button<'_, _, Theme, Renderer> = button(
+        fa_icon_solid("expand").size(20.0).color(color!(255, 255, 255))
+    ).on_press(Message::FullscreenToggle(true));
+
     let exit_button: iced::widget::Button<'_, _, Theme, Renderer> = button(
         fa_icon_solid("xmark").size(20.0).color(color!(255, 255, 255))
     ).on_press(Message::Exit);
@@ -47,6 +51,7 @@ pub fn new(is_playing: &bool, is_randomized: &bool) -> Element<'static, Message>
         play_pause_button,
         next_button,
         random_button,
+        fullscreen_button,
         open_folder_button,
         exit_button
     )
@@ -57,7 +62,7 @@ pub fn new(is_playing: &bool, is_randomized: &bool) -> Element<'static, Message>
         .push(app_title)
         .push(controls)
         .width(Fill)
-        .spacing(2000)
+        .spacing(1975)
         .align_y(Alignment::Center)
         .into()
 }

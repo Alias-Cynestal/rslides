@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
-use iced::{Element, Task};
+use iced::{event, keyboard, Element, Event, Task};
+use iced::keyboard::key::Named;
 use iced::widget::image::Handle;
 use crate::ui;
 use iced::Subscription;
@@ -15,11 +16,13 @@ pub enum Message {
     PreviousSlide,
     PlaySlideshow,
     PauseSlideshow,
+    TogglePlayPause,
     OpenFolder,
     RandomizeSlides,
     ResetSlideOrder,
     ImageLoaded(usize, Handle),
     FolderSelected(Response),
+    FullscreenToggle(bool),
     Exit,
 }
 
@@ -31,6 +34,7 @@ pub(crate) struct RSlidesState {
     pub current_index: usize,
     pub is_playing: bool,
     pub is_randomized: bool,
+    pub is_fullscreen: bool,
     pub slideshow_interval_secs: u64,
 }
 
@@ -47,6 +51,7 @@ impl RSlides {
             nb_preloaded_images: 10,
             current_index: 0,
             is_playing: false,
+            is_fullscreen: false,
             is_randomized: false,
             slideshow_interval_secs: 2500,
         };
@@ -71,6 +76,9 @@ impl RSlides {
             Message::PauseSlideshow => {
                 self.app_state.is_playing = false;
             },
+            Message::TogglePlayPause => {
+                self.app_state.is_playing = !self.app_state.is_playing;
+            }
             Message::OpenFolder => {
                 return select_folder()
             },
@@ -95,6 +103,9 @@ impl RSlides {
                 reset_slide_order(&mut self.app_state);
                 return self.preload_handles_async();
             },
+            Message::FullscreenToggle(is_fullscreen) => {
+                self.app_state.is_fullscreen = is_fullscreen;
+            }
         }
         Task::none()
     }
@@ -201,13 +212,32 @@ impl RSlides {
         ui::view(&self.app_state)
     }
 
-    pub fn timer_subscription(&self) -> Subscription<Message> {
+    pub fn subscriptions(&self) -> Subscription<Message> {
+        Subscription::batch(vec![
+            self.timer_subscription(),
+            self.keyboard_subscription(),
+        ])
+    }
+
+    fn timer_subscription(&self) -> Subscription<Message> {
         if self.app_state.is_playing {
             iced::time::every(std::time::Duration::from_millis(self.app_state.slideshow_interval_secs))
                 .map(|_| Message::NextSlide)
         } else {
             Subscription::none()
         }
+    }
+
+    fn keyboard_subscription(&self) -> Subscription<Message> {
+        event::listen_with(move |event, _, _| {
+            match event {
+                Event::Keyboard(keyboard::Event::KeyPressed {key: keyboard::Key::Named(Named::ArrowRight) , .. }) => Some(Message::NextSlide),
+                Event::Keyboard(keyboard::Event::KeyPressed {key: keyboard::Key::Named(Named::ArrowLeft) , .. }) => Some(Message::PreviousSlide),
+                Event::Keyboard(keyboard::Event::KeyPressed {key: keyboard::Key::Named(Named::Space) , .. }) => Some(Message::TogglePlayPause),
+                Event::Keyboard(keyboard::Event::KeyPressed {key: keyboard::Key::Named(Named::Escape) , ..}) => Some(Message::FullscreenToggle(false)),
+                _ => None,
+            }
+        })
     }
 }
 
