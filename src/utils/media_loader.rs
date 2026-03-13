@@ -14,7 +14,7 @@ pub async fn load_media_async(index: usize, path: PathBuf) -> Option<(usize, Med
     match get_media_type(&path) {
         MediaType::Image => {
             let image = load_image_async(index, path).await;
-            Some((index, MediaHandle::Image(image.1)))
+            Some((index, MediaHandle::Image(image)))
         }
         MediaType::Video => {
             Some((index, MediaHandle::Video(url::Url::from_file_path(path).expect("REASON"))))
@@ -23,7 +23,7 @@ pub async fn load_media_async(index: usize, path: PathBuf) -> Option<(usize, Med
     }
 }
 
-async fn load_image_async(index: usize, path: PathBuf) -> (usize, Handle) {
+async fn load_image_async(index: usize, path: PathBuf) -> Handle {
     let handle = smol::unblock(move || {
         if let Ok(bytes) = std::fs::read(&path) {
             if let Ok(img) = image::load_from_memory(&bytes) {
@@ -36,29 +36,27 @@ async fn load_image_async(index: usize, path: PathBuf) -> (usize, Handle) {
     })
         .await;
 
-    (index, handle)
+    handle
 }
 
 pub async fn prepare_video_async(
-    index: usize,
     uri: url::Url,
-) -> Option<(usize, url::Url, Arc<Mutex<Option<Video>>>)> {
+) -> Option<(url::Url, Arc<Mutex<Option<Video>>>)> {
     let slot = Arc::new(Mutex::new(None));
     let slot_for_worker = Arc::clone(&slot);
     let uri_for_worker = uri.clone();
 
     smol::unblock(move || {
-        if let Ok(mut video) = Video::new(&uri_for_worker) {
-            video.set_looping(true);
-            video.set_paused(true);
-            if let Ok(mut guard) = slot_for_worker.lock() {
-                *guard = Some(video);
-            }
+        let mut video = Video::new(&uri_for_worker).expect("Failed to create video");
+        video.set_looping(true);
+        video.set_paused(true);
+        if let Ok(mut guard) = slot_for_worker.lock() {
+            *guard = Some(video);
         }
     })
     .await;
 
-    Some((index, uri, slot))
+    Some((uri, slot))
 }
 
 pub(crate) fn get_media_type(path: &PathBuf) -> MediaType {

@@ -106,10 +106,10 @@ impl RSlides {
                     let uri = uri.clone();
                     self.app_state.media_handles.insert(index, handle);
                     return Task::perform(
-                        prepare_video_async(index, uri.clone()),
+                        prepare_video_async(uri),
                         move |res| match res {
-                            Some((ready_index, ready_uri, video)) => {
-                                Message::VideoPrepared((ready_index, ready_uri, video))
+                            Some((ready_uri, video)) => {
+                                Message::VideoPrepared((index, ready_uri, video))
                             }
                             None => Message::None,
                         },
@@ -119,16 +119,17 @@ impl RSlides {
             },
             Message::VideoPrepared((index, uri, video_slot)) => {
                 let is_current_video = matches!(
-                    self.app_state.media_handles.get(&index),
+                    self.app_state.media_handles.get(&self.app_state.current_index),
                     Some(MediaHandle::Video(current_uri)) if current_uri == &uri
                 );
 
-                if is_current_video {
-                    if let Ok(mut guard) = video_slot.lock() {
-                        if let Some(mut video) = guard.take() {
+                if let Ok(mut guard) = video_slot.lock() {
+                    if let Some(mut video) = guard.take() {
+                        if is_current_video {
                             video.set_paused(false);
-                            self.app_state.videos_cache.insert(index, video);
                         }
+                        video.set_looping(true);
+                        self.app_state.videos_cache.insert(index, video);
                     }
                 }
             },
@@ -171,7 +172,6 @@ impl RSlides {
 
         let end = (current + preload_range) % total;
 
-        // Collect indices to load
         let mut indices_to_load = Vec::new();
         if start <= end {
             for i in start..=end {
@@ -239,15 +239,7 @@ impl RSlides {
         }
         if let Some(path) = self.app_state.files.get(index_to_load) {
             let path = path.clone();
-            Task::perform(
-                load_media_async(index_to_load, path.1),
-                move |res| {
-                    match res {
-                        Some((index, handle)) => Message::MediaLoaded((index, handle)),
-                        None => Message::None,
-                    }
-                }
-            )
+            Self::get_media_load_task(index_to_load, path.1.clone())
         } else {
             Task::none()
         }

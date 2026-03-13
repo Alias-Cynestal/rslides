@@ -5,6 +5,7 @@ pub(crate) fn get_next_slide(app_state: &mut crate::app::RSlidesState) {
     if app_state.current_folder.is_some() && !app_state.files.is_empty() {
         handle_end_current_slide_is_video(app_state);
         app_state.current_index = (app_state.current_index + 1) % app_state.files.len();
+        handle_start_current_slide_is_video(app_state)
     }
 }
 
@@ -16,6 +17,7 @@ pub(crate) fn get_previous_slide(app_state: &mut crate::app::RSlidesState) {
         } else {
             app_state.current_index - 1
         };
+        handle_start_current_slide_is_video(app_state);
     }
 }
 
@@ -38,5 +40,11 @@ fn handle_end_current_slide_is_video(app_state: &mut crate::app::RSlidesState) {
     if let Some(video) = app_state.videos_cache.get_mut(&app_state.current_index) {
         video.set_paused(true);
         let _ = video.seek(Duration::ZERO, true);
+    }
+}
+
+fn handle_start_current_slide_is_video(app_state: &mut crate::app::RSlidesState) {
+    if let Some(video) = app_state.videos_cache.get_mut(&app_state.current_index) {
+        video.set_paused(false);
     }
 }
