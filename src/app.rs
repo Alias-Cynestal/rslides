@@ -1,14 +1,16 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 use iced::{event, keyboard, Element, Event, Task};
 use iced::keyboard::key::Named;
 use iced::widget::image::Handle;
 use crate::ui;
 use iced::Subscription;
+use iced_video_player::Video;
 use nfd2::Response;
 use crate::utils::handle_slideshow::{get_next_slide, get_previous_slide, randomize_slides, reset_slide_order};
+use crate::utils::media_loader::{load_media_async, prepare_video_async};
 use crate::utils::open_folder::{load_folder, select_folder};
-use crate::utils::image_loader::load_image_async;
 
 #[derive(Clone)]
 pub enum Message {
@@ -20,16 +22,25 @@ pub enum Message {
     OpenFolder,
     RandomizeSlides,
     ResetSlideOrder,
-    ImageLoaded(usize, Handle),
+    MediaLoaded((usize, MediaHandle)),
+    VideoPrepared((usize, url::Url, Arc<Mutex<Option<Video>>>)),
     FolderSelected(Response),
     FullscreenToggle(bool),
+    None,
     Exit,
+}
+
+#[derive(Debug, Clone)]
+pub enum MediaHandle {
+    Image(Handle),
+    Video(url::Url),
 }
 
 pub(crate) struct RSlidesState {
     pub current_folder: Option<PathBuf>,
-    pub images: Vec<(usize, PathBuf)>, // Store index to return to original order if needed
-    pub images_handles: HashMap<usize, Handle>,
+    pub files: Vec<(usize, PathBuf)>, // Store index to return to original order if needed
+    pub media_handles: HashMap<usize, MediaHandle>,
+    pub videos_cache: HashMap<usize, Video>,
     pub nb_preloaded_images: usize,
     pub current_index: usize,
     pub is_playing: bool,
@@ -46,8 +57,9 @@ impl RSlides {
     pub fn new() -> Self {
         let app_state = RSlidesState {
             current_folder: None,
-            images: Vec::new(),
-            images_handles: HashMap::new(),
+            files: Vec::new(),
+            media_handles: HashMap::new(),
+            videos_cache: HashMap::new(),
             nb_preloaded_images: 10,
             current_index: 0,
             is_playing: false,
@@ -84,13 +96,41 @@ impl RSlides {
             },
             Message::FolderSelected(response) => {
                 load_folder(&mut self.app_state, response);
-                if (self.app_state.is_randomized) {
+                if self.app_state.is_randomized {
                     randomize_slides(&mut self.app_state);
                 }
                 return self.preload_handles_async();
             },
-            Message::ImageLoaded(index, handle) => {
-                self.app_state.images_handles.insert(index, handle);
+            Message::MediaLoaded((index, handle)) => {
+                if let MediaHandle::Video(uri) = &handle {
+                    let uri = uri.clone();
+                    self.app_state.media_handles.insert(index, handle);
+                    return Task::perform(
+                        prepare_video_async(index, uri.clone()),
+                        move |res| match res {
+                            Some((ready_index, ready_uri, video)) => {
+                                Message::VideoPrepared((ready_index, ready_uri, video))
+                            }
+                            None => Message::None,
+                        },
+                    );
+                }
+                self.app_state.media_handles.insert(index, handle);
+            },
+            Message::VideoPrepared((index, uri, video_slot)) => {
+                let is_current_video = matches!(
+                    self.app_state.media_handles.get(&index),
+                    Some(MediaHandle::Video(current_uri)) if current_uri == &uri
+                );
+
+                if is_current_video {
+                    if let Ok(mut guard) = video_slot.lock() {
+                        if let Some(mut video) = guard.take() {
+                            video.set_paused(false);
+                            self.app_state.videos_cache.insert(index, video);
+                        }
+                    }
+                }
             },
             Message::Exit => std::process::exit(0),
             Message::RandomizeSlides => {
@@ -105,16 +145,18 @@ impl RSlides {
             },
             Message::FullscreenToggle(is_fullscreen) => {
                 self.app_state.is_fullscreen = is_fullscreen;
-            }
+            },
+            Message::None => (),
         }
         Task::none()
     }
 
     fn preload_handles_async(&mut self) -> Task<Message> {
-        self.app_state.images_handles.clear();
+        self.app_state.media_handles.clear();
+        self.app_state.videos_cache.clear();
 
         let current = self.app_state.current_index;
-        let total = self.app_state.images.len();
+        let total = self.app_state.files.len();
         let preload_range = self.app_state.nb_preloaded_images;
 
         if total == 0 {
@@ -146,14 +188,10 @@ impl RSlides {
 
         let tasks: Vec<Task<Message>> = indices_to_load
             .into_iter()
-            .filter(|&i| !self.app_state.images_handles.contains_key(&i))
+            .filter(|&i| !self.app_state.media_handles.contains_key(&i))
             .filter_map(|i| {
-                self.app_state.images.get(i).map(|path| {
-                    let path = path.clone();
-                    Task::perform(
-                        load_image_async(i, path.1),
-                        |(index, handle)| Message::ImageLoaded(index, handle)
-                    )
+                self.app_state.files.get(i).map(|path| {
+                    Self::get_media_load_task(i, path.1.clone())
                 })
             })
             .collect();
@@ -163,7 +201,7 @@ impl RSlides {
 
     fn update_handles_async(&mut self, is_moving_forward: bool) -> Task<Message> {
         let current = self.app_state.current_index;
-        let total = self.app_state.images.len();
+        let total = self.app_state.files.len();
         let preload_range = self.app_state.nb_preloaded_images;
         let max_handles = 2 * preload_range + 1;
 
@@ -177,8 +215,9 @@ impl RSlides {
             } else {
                 total.saturating_sub(preload_range - current)
             };
-            if self.app_state.images_handles.len() > max_handles {
-                self.app_state.images_handles.remove(&oldest_relevant);
+            if self.app_state.media_handles.len() > max_handles {
+                self.app_state.media_handles.remove(&oldest_relevant);
+                self.app_state.videos_cache.remove(&oldest_relevant);
             }
             next_to_load
         } else {
@@ -188,20 +227,26 @@ impl RSlides {
                 total.saturating_sub(preload_range - current)
             };
             let newest_irrelevant = (current + preload_range) % total;
-            if self.app_state.images_handles.len() > max_handles {
-                self.app_state.images_handles.remove(&newest_irrelevant);
+            if self.app_state.media_handles.len() > max_handles {
+                self.app_state.media_handles.remove(&newest_irrelevant);
+                self.app_state.videos_cache.remove(&newest_irrelevant);
             }
             prev_to_load
         };
 
-        if self.app_state.images_handles.contains_key(&index_to_load) {
+        if self.app_state.media_handles.contains_key(&index_to_load) {
             return Task::none();
         }
-        if let Some(path) = self.app_state.images.get(index_to_load) {
+        if let Some(path) = self.app_state.files.get(index_to_load) {
             let path = path.clone();
             Task::perform(
-                load_image_async(index_to_load, path.1),
-                |(index, handle)| Message::ImageLoaded(index, handle)
+                load_media_async(index_to_load, path.1),
+                move |res| {
+                    match res {
+                        Some((index, handle)) => Message::MediaLoaded((index, handle)),
+                        None => Message::None,
+                    }
+                }
             )
         } else {
             Task::none()
@@ -210,6 +255,18 @@ impl RSlides {
 
     pub fn view(&self) -> Element<'_, Message> {
         ui::view(&self.app_state)
+    }
+
+    fn get_media_load_task(index: usize, path: PathBuf) -> Task<Message> {
+        Task::perform(
+            load_media_async(index, path),
+            move |res| {
+                match res {
+                    Some((index, handle)) => Message::MediaLoaded((index, handle)),
+                    None => Message::None,
+                }
+            }
+        )
     }
 
     pub fn subscriptions(&self) -> Subscription<Message> {
@@ -240,4 +297,3 @@ impl RSlides {
         })
     }
 }
-

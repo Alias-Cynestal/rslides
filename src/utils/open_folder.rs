@@ -20,13 +20,13 @@ pub(crate) fn load_folder(app_state: &mut crate::app::RSlidesState, response: Re
                 .map(|entry| entry.path())
                 .filter(|path| {
                     if let Some(ext) = path.extension() {
-                        matches!(ext.to_str().unwrap_or("").to_lowercase().as_str(), "jpg" | "jpeg" | "png" | "bmp" | "gif")
+                        matches!(ext.to_str().unwrap_or("").to_lowercase().as_str(), "jpg" | "jpeg" | "png" | "bmp" | "gif" | "webp" | "mp4" | "avi" | "mkv")
                     } else {
                         false
                     }
                 })
                 .for_each(|path| {
-                    app_state.images.push((i, path));
+                    app_state.files.push((i, path));
                     i += 1;
                 });
         }
@@ -40,6 +40,6 @@ async fn open_file_dialog() -> Response {
 
 fn reset_slideshow(app_state: &mut crate::app::RSlidesState) {
     app_state.current_index = 0;
-    app_state.images.clear();
+    app_state.files.clear();
     app_state.current_folder = None;
 }
