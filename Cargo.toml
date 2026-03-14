@@ -20,7 +20,8 @@ url = "2.5.8"
 name = "YourApp"
 identifier = "com.cynestal.rslides"
 resources = [
-    { src = "./target/release/*.dll", target = "" }
+    { src = "./target/release/*.dll", target = "" },
+    { src = "./target/release/gstreamer-1.0/*.dll", target = "gstreamer-1.0" }
 ]
 before-packaging-command = "cargo build --release"
 out-dir = "./target/dist"
