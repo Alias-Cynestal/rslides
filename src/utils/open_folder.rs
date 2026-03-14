@@ -1,14 +1,17 @@
 use std::fs::read_dir;
 use std::path::PathBuf;
+
 use iced::Task;
 use nfd2::Response;
-use crate::app::Message;
 
-pub(crate) fn select_folder() -> Task<Message> {
-    Task::perform(open_file_dialog(), Message::FolderSelected)
+use crate::state::slideshow_page_state::SlideshowPageState;
+use crate::widgets::slideshow_page::SlideshowMessage;
+
+pub(crate) fn select_folder() -> Task<SlideshowMessage> {
+    Task::perform(open_file_dialog(), SlideshowMessage::FolderSelected)
 }
 
-pub(crate) fn load_folder(app_state: &mut crate::app::RSlidesState, response: Response) {
+pub(crate) fn load_folder(app_state: &mut SlideshowPageState, response: Response) {
     let mut i = 0;
     match response {
         Response::Okay(folder_path) => {
@@ -20,7 +23,18 @@ pub(crate) fn load_folder(app_state: &mut crate::app::RSlidesState, response: Re
                 .map(|entry| entry.path())
                 .filter(|path| {
                     if let Some(ext) = path.extension() {
-                        matches!(ext.to_str().unwrap_or("").to_lowercase().as_str(), "jpg" | "jpeg" | "png" | "bmp" | "gif" | "webp" | "mp4" | "avi" | "mkv")
+                        matches!(
+                            ext.to_str().unwrap_or("").to_lowercase().as_str(),
+                            "jpg"
+                                | "jpeg"
+                                | "png"
+                                | "bmp"
+                                | "gif"
+                                | "webp"
+                                | "mp4"
+                                | "avi"
+                                | "mkv"
+                        )
                     } else {
                         false
                     }
@@ -38,7 +52,7 @@ async fn open_file_dialog() -> Response {
     nfd2::open_pick_folder(None).expect("Failed to open nfd")
 }
 
-fn reset_slideshow(app_state: &mut crate::app::RSlidesState) {
+fn reset_slideshow(app_state: &mut SlideshowPageState) {
     app_state.current_index = 0;
     app_state.files.clear();
     app_state.current_folder = None;

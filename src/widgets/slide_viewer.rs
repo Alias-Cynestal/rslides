@@ -1,18 +1,20 @@
-use iced::{Background, Center, Color, ContentFit, Element, Fill, Length, Renderer, Theme};
+use iced::{Background, Center, Color, ContentFit, Element, Fill, Renderer, Theme};
 use iced::widget::{container, image, text, Column};
 use iced_aw::Spinner;
 use iced_video_player::VideoPlayer;
-use crate::app::{MediaHandle, Message};
+use crate::state::slideshow_page_state::{MediaHandle, SlideshowPageState};
+use crate::widgets::slideshow_page::SlideshowMessage;
 
-pub fn new<'a>(app_state: &'_ crate::app::RSlidesState) -> Element<'_, crate::app::Message> {
+pub fn new(app_state: &SlideshowPageState) -> Element<'_, SlideshowMessage> {
     if let Some(_current_folder) = &app_state.current_folder {
         if !app_state.files.is_empty() {
             match app_state.media_handles.get(&app_state.current_index) {
                 Some(MediaHandle::Video(_)) => {
                     if let Some(video) = app_state.videos_cache.get(&app_state.current_index) {
-                        let media_player: VideoPlayer<'_, Message, Theme, Renderer> = iced_video_player::VideoPlayer::new(video)
-                            .width(Fill)
-                            .height(Fill);
+                        let media_player: VideoPlayer<'_, SlideshowMessage, Theme, Renderer> =
+                            VideoPlayer::new(video)
+                                .width(Fill)
+                                .height(Fill);
                         return container(media_player)
                             .width(Fill)
                             .height(Fill)
@@ -21,7 +23,7 @@ pub fn new<'a>(app_state: &'_ crate::app::RSlidesState) -> Element<'_, crate::ap
                                 background: Some(Background::Color(Color::from_rgb8(0, 0, 0))),
                                 ..Default::default()
                             })
-                            .into()
+                            .into();
                     }
 
                     return container(
@@ -39,14 +41,15 @@ pub fn new<'a>(app_state: &'_ crate::app::RSlidesState) -> Element<'_, crate::ap
                     .into();
                 }
                 Some(MediaHandle::Image(handle)) => {
-                    let image = if let Some(_handle) = app_state.media_handles.get(&app_state.current_index) {
+                    let image = if let Some(_handle) = app_state.media_handles.get(&app_state.current_index)
+                    {
                         image(handle)
                     } else {
                         let current_image_path = &app_state.files[app_state.current_index].1;
                         image(current_image_path)
                     }
-                    .width(Length::Fill)
-                    .height(Length::Fill)
+                    .width(Fill)
+                    .height(Fill)
                     .content_fit(ContentFit::Contain);
 
                     return container(image)

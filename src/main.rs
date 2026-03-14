@@ -1,7 +1,7 @@
 #![windows_subsystem = "windows"]
 
 mod app;
-mod ui;
+mod state;
 mod widgets;
 pub mod utils;
 
@@ -34,16 +34,18 @@ pub fn main() -> iced::Result {
             platform_specific: Default::default(),
             exit_on_close_request: true,
         })
+        .title(RSlides::title)
         .subscription(RSlides::subscriptions)
         .run()
 }
+
 
 fn configure_gstreamer_runtime() {
     if !cfg!(target_os = "windows") {
         return;
     }
 
-    let exe_dir: PathBuf = match std::env::current_exe()
+    let exe_dir: PathBuf = match env::current_exe()
         .ok()
         .and_then(|p| p.parent().map(|d| d.to_path_buf()))
     {

@@ -1,8 +1,10 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+
 use iced::advanced::image::Handle;
 use iced_video_player::Video;
-use crate::app::{MediaHandle};
+
+use crate::state::slideshow_page_state::MediaHandle;
 
 pub(crate) enum MediaType {
     Image,
@@ -23,7 +25,7 @@ pub async fn load_media_async(index: usize, path: PathBuf) -> Option<(usize, Med
     }
 }
 
-async fn load_image_async(index: usize, path: PathBuf) -> Handle {
+async fn load_image_async(_index: usize, path: PathBuf) -> Handle {
     let handle = smol::unblock(move || {
         if let Ok(bytes) = std::fs::read(&path) {
             if let Ok(img) = image::load_from_memory(&bytes) {
